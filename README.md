@@ -8,6 +8,7 @@ When successful, the plan is to create a playing agent for the full Lost Cities 
 I'm seeking individuals who would like to collaborate on this project.
 
 FIRST MODEL - V1C
+
 I have a working version running and it is able to learn how to play the game. Not great, but nonetheless, it can play somewhat well.
 Now, the goal is to collaborate with others on this version aimed at the reduced size 18 card game of Lost Cities.
 
