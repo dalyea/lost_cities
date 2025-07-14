@@ -1,5 +1,4 @@
-# lost_cities
-Reinforcement Learning For Lost Cities - Version V1ES
+# Reinforcement Learning For Lost Cities - Version V1ES
 
 GRID SEARCH - Version V1ES
 
@@ -36,10 +35,15 @@ I used the final 20,000 scores from each grid training output final scores (100,
 15:    episode_booster                                                                      0.5     8 0.9126937
 </pre>
 
+Here is a bar plot to get some idea about the parameter value impacts.
+
+![Learning Progress](top-parameters-20000.png)
+
 This indicates that those 3 particular step reward helpers are best, especially compared to the other sets. However, using all 5 helpers might be ok (line 6).
 The step_booster is definitely better at 5.0.  NN layer 1 is best with 96 neurons (should I try 128 now?).  The replay size at 20000 or 10000 is close, but
 my inclination is to even try a larger replay sizing.  I will seek other metrics by which to compare the grid features to determine which are the best values.
 
-Here is the final scores, grouped 500 at a time, for the top 8 configs from the grid search (so far).
+Here is the final scores, grouped 500 at a time, for the top 8 configs from the grid search (so far).  This gives a visual on how the RI progresses in learning
+for some of the top grid combinations.
 
 ![Learning Progress](top8-line-20000.png)
