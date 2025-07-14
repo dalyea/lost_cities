@@ -16,6 +16,7 @@ Under consideration are:
 
 I used the final 20,000 scores from each grid training output final scores (100,000 total) as the benchmark to look to see, which aspects of the training are having the best impact on raising the bot scores.
 
+<pre>
                    var                                                                    value     n      mean
 ===============================================================================================================
  1:     step_functions                               ['good_exp', 'draw_to_tgt', 'too_few_pts']     4 1.5104250
@@ -33,6 +34,7 @@ I used the final 20,000 scores from each grid training output final scores (100,
 13:     step_functions                                              ['good_exp', 'draw_to_tgt']     8 0.9229812
 14:     step_functions               ['good_exp', 'draw_to_tgt', 'too_few_pts', 'good_low_val']     4 0.9228125
 15:    episode_booster                                                                      0.5     8 0.9126937
+</pre>
 
 This indicates that those 3 particular step reward helpers are best, especially compared to the other sets. However, using all 5 helpers might be ok (line 6).
 The step_booster is definitely better at 5.0.  NN layer 1 is best with 96 neurons (should I try 128 now?).  The replay size at 20000 or 10000 is close, but
