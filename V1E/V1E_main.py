@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-
 # LOST CITIES
 # General setup for 18 card game
 import random
@@ -366,6 +365,18 @@ class ActorCritic(nn.Module):
         return policy_action_logits, policy_draw_logits, value
 
 
+def save_config_txt(running, fv, config_dict, step_functions):
+    filename = f"config_{running}_{fv}.txt"
+    with open(filename, "w") as f:
+        f.write(f"Config for version: {fv}\n")
+        f.write(f"Generated: {datetime.datetime.now()}\n\n")
+        for key, val in config_dict.items():
+            f.write(f"{key:<20} = {val}\n")
+        f.write("\nStep Reward Functions:\n")
+        for fn in step_functions:
+            f.write(f"- {fn}\n")
+    print(f"Configuration saved to {filename}")
+
 def compute_step_reward(state, action, draw_choice, env, step_functions, rule_counter=None):
     # Setup
     step_reward = 0.0
@@ -378,9 +389,10 @@ def compute_step_reward(state, action, draw_choice, env, step_functions, rule_co
     expedition_pile = env.expeditions[state['current_player']][played_color]
     existing_numbers = [int(c[1]) for c in expedition_pile if c[1] != 'X']
     deck_remaining = state['deck_size']
+    opponent = [p for p in env.players if p != state['current_player']][0]
    
     # Bad Move 1: Playing high card when holding lower card
-    if 'lover_val_avail' in step_functions:
+    if 'lower_val_avail' in step_functions:
         same_color_cards = [c for c in player_hand if c[0] == action[1][0] and c[1] != 'X']
         if same_color_cards and action[0] == 'expedition' and is_number_card:
             min_in_hand = min([int(c[1]) for c in same_color_cards])
@@ -399,7 +411,6 @@ def compute_step_reward(state, action, draw_choice, env, step_functions, rule_co
     # Maybe wrong?
     # Bad Move 3: Starting expedition when opponent blocks reaching 7
     if 'blocked_7' in step_functions:
-        opponent = [p for p in env.players if p != state['current_player']][0]
         opp_cards = env.expeditions[opponent].get(action[1][0], [])
         opp_sum = sum([int(c[1]) for c in opp_cards if c[1] != 'X'])
         hand_sum = sum([int(c[1]) for c in player_hand if c[0] == action[1][0] and c[1] != 'X'])
@@ -581,15 +592,219 @@ def compute_step_reward(state, action, draw_choice, env, step_functions, rule_co
         
     return step_reward
 
-def save_config_txt(running, fv, config_dict, step_functions):
-    filename = f"config_{running}_{fv}.txt"
-    with open(filename, "w") as f:
-        f.write(f"Config for version: {fv}\n")
-        f.write(f"Generated: {datetime.datetime.now()}\n\n")
-        for key, val in config_dict.items():
-            f.write(f"{key:<20} = {val}\n")
-        f.write("\nStep Reward Functions:\n")
-        for fn in step_functions:
-            f.write(f"- {fn}\n")
-    print(f"Configuration saved to {filename}")
+def compute_step_reward_grid(state, action, draw_choice, env, step_functions, reward_params, rule_counter=None):
+
+    # All rewards come from this global
+    # global reward_params
+    # print("reward_params:", reward_params)
+
+    # Setup
+    step_reward = 0.0
+    max_reward = 2.0
+    player_hand = state['hands'][state['current_player']]
+    is_expedition = action[0] == 'expedition'
+    is_number_card = action[1][1] != 'X'
+    played_color = action[1][0]
+    played_value = int(action[1][1]) if is_number_card else None
+    expedition_pile = env.expeditions[state['current_player']][played_color]
+    existing_numbers = [int(c[1]) for c in expedition_pile if c[1] != 'X']
+    deck_remaining = state['deck_size']
+    opponent = [p for p in env.players if p != state['current_player']][0]
+   
+    # Bad Move 1: Playing high card when holding lower card
+    rfnc='lower_val_avail'
+    if rfnc in step_functions and rfnc in reward_params:
+        same_color_cards = [c for c in player_hand if c[0] == action[1][0] and c[1] != 'X']
+        if same_color_cards and action[0] == 'expedition' and is_number_card:
+            min_in_hand = min([int(c[1]) for c in same_color_cards])
+            if int(action[1][1]) > min_in_hand:
+                step_reward += reward_params[rfnc]
+                rule_counter["lower_val_avail"] += 1
+
+    # Bad Move 2: Starting expedition with <6 points in hand
+    rfnc='too_few_pts'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and len(env.expeditions[state['current_player']][action[1][0]]) == 0:
+            color_sum = sum([int(c[1]) for c in player_hand if c[0] == action[1][0] and c[1] != 'X'])
+            if color_sum < tgt_pts:
+                step_reward += reward_params[rfnc]
+                rule_counter["too_few_pts"] += 1
+
+    # Maybe wrong?
+    # Bad Move 3: Starting expedition when opponent blocks reaching 7
+    rfnc='blocked_7'
+    if rfnc in step_functions and rfnc in reward_params:
+        opp_cards = env.expeditions[opponent].get(action[1][0], [])
+        opp_sum = sum([int(c[1]) for c in opp_cards if c[1] != 'X'])
+        hand_sum = sum([int(c[1]) for c in player_hand if c[0] == action[1][0] and c[1] != 'X'])
+        if is_expedition and len(env.expeditions[state['current_player']][action[1][0]]) == 0:
+            if opp_sum + hand_sum < tgt_pts:
+                step_reward += reward_params[rfnc]
+                rule_counter["blocked_7"] += 1
+
+    # Bad Move 4: Starting expedition with <=3 cards left
+    rfnc='exp_small_deck'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and len(env.expeditions[state['current_player']][action[1][0]]) == 0:
+            if deck_remaining <= 3:
+                step_reward += reward_params[rfnc]
+                rule_counter["exp_small_deck"] += 1
+
+    # Bad Move 5: Discarding to center when expedition is started and playable
+    rfnc='exp_was_live'
+    if rfnc in step_functions and rfnc in reward_params:
+        expedition_pile = env.expeditions[state['current_player']][action[1][0]]
+        if action[0] == 'center' and expedition_pile:
+            top_val = max([int(c[1]) for c in expedition_pile if c[1] != 'X'], default=0)
+            card_val = int(action[1][1]) if action[1][1] != 'X' else None
+            if card_val is not None and card_val >= top_val:
+                step_reward += reward_params[rfnc]
+                rule_counter["exp_was_live"] += 1
+
+    # Good Move: Playing strong expedition (holding >=6 points)
+    rfnc='good_exp'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition:
+            color_sum = sum([int(c[1]) for c in player_hand if c[0] == action[1][0] and c[1] != 'X'])
+            if color_sum >= tgt_pts-1:
+                # DA - exception code here
+                step_reward += reward_params['good_exp_1']
+                rule_counter["good_exp_1"] += 1
+            if color_sum >= tgt_pts:
+                step_reward += reward_params[rfnc]
+                rule_counter["good_exp"] += 1
+
+    # Penalty 3: Playing RX/BX/GX with no number cards in hand
+    rfnc='bad_X'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and action[1][1] == 'X':
+            same_color_numbers = [c for c in player_hand if c[0] == action[1][0] and c[1] != 'X']
+            if not same_color_numbers:
+                step_reward += reward_params[rfnc]
+                rule_counter["bad_X"] += 1
+
+    # Penalty 4: Playing R5 while holding R2 or R3
+    rfnc='bad_bigger_val'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and action[1][1] != 'X':
+            played_value = int(action[1][1])
+            lower_cards = [int(c[1]) for c in player_hand if c[0] == action[1][0] and c[1] != 'X' and int(c[1]) < played_value]
+            if lower_cards:
+                step_reward += reward_params[rfnc]
+                rule_counter["bad_bigger_val"] += 1
+
+    # Bonus: Excellent lowest-card play with multiple cards in hand
+    rfnc='good_low_val'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and is_number_card:
+            played_color = action[1][0]
+            played_value = int(action[1][1])
+            same_color_cards = [int(c[1]) for c in player_hand if c[0] == played_color and c[1] != 'X']
+            total_points_in_hand = sum(same_color_cards)
+            num_cards_in_hand = len(same_color_cards)
+            if num_cards_in_hand >= 2 and played_value <= min(same_color_cards): # DADA and total_points_in_hand >= tgt_pts-1
+                step_reward += reward_params[rfnc]
+                rule_counter["good_low_val"] += 1
+
+    # Good Draw Move: Drawing card to create >=7 points
+    rfnc='draw_to_tgt'
+    if rfnc in step_functions and rfnc in reward_params:
+        if draw_choice in COLORS:
+            center_pile = state['center'][draw_choice]
+            if center_pile:
+                center_card = center_pile[-1]
+                if center_card[1] != 'X':
+                    center_val = int(center_card[1])
+                    color_cards = [int(c[1]) for c in player_hand if c[0] == draw_choice and c[1] != 'X']
+                    total_points = sum(color_cards)
+                    num_cards = len(color_cards)
+                    if num_cards in [1, 2] and (total_points + center_val) >= tgt_pts:
+                        step_reward += reward_params[rfnc]
+                        rule_counter["draw_to_tgt"] += 1
+
+    # Apply penalty: playing a number card to an empty expedition when holding the multiplier,
+    # and when the total known value in hand for this color would make the expedition profitable (7+)
+    # Bad Move 7: Playing number card before multiplier when expedition is empty and enough points exist
+    rfnc='had_X'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and is_number_card:
+            played_color = action[1][0]
+            expedition_pile = env.expeditions[state['current_player']][played_color]
+            
+            # Check if expedition is empty
+            if not expedition_pile:
+                # Get all cards in hand for this color
+                color_cards_in_hand = [c for c in player_hand if c[0] == played_color]
+                number_points = sum(int(c[1]) for c in color_cards_in_hand if c[1] != 'X')
+                has_multiplier = any(c[1] == 'X' for c in color_cards_in_hand)
+                
+                if has_multiplier and number_points >= tgt_pts and state['deck_size'] >= 5:
+                    # Player should have played the multiplier first!
+                    step_reward += reward_params[rfnc]
+                    rule_counter["had_X"] += 1
+
+    # This is captured above as too_few_pts
+    # # Penalty: Starting a new expedition with less than 7 points in hand
+    # if is_expedition:
+    #     color = action[1][0]
+    #     expedition_pile = env.expeditions[state['current_player']][color]
+    #     if not expedition_pile:  # Starting new expedition
+    #         # color_points = sum(int(c[1]) for c in player_hand if c[0] == color and c[1] in '23456')
+    #         color_points = sum(int(c[1]) for c in player_hand if c[0] == color and c[1] != 'X')
+    #         if color_points < tgt_pts:
+    #             # print(f"Penalty triggered: starting {color} expedition with {color_points} points in hand.")
+    #             step_reward -= 1.333
+    #             rule_counter["less_7"] += 1
+
+    # OK
+    # Bonus: Playing the immediate next card in sequence (no gaps)
+    rfnc='next_value'
+    if rfnc in step_functions and rfnc in reward_params:
+        if is_expedition and is_number_card and deck_remaining>=3:
+            played_color = action[1][0]
+            played_value = int(action[1][1])
+        
+            expedition_pile = env.expeditions[state['current_player']][played_color]
+            existing_numbers = [int(c[1]) for c in expedition_pile if c[1] != 'X']
+        
+            if existing_numbers:
+                top_value = max(existing_numbers)
+                if played_value == top_value + 1:
+                    step_reward += reward_params[rfnc]
+                    rule_counter["next_value"] += 1
+                    if random.random() < 1e-8:
+                        print(f"Reward playing next value card {action} on {played_color}{top_value}")
+
+    # ❌ Bad Move: Discarding card of color with strong expedition potential and enough deck remaining
+    rfnc='bad_center'
+    if rfnc in step_functions and rfnc in reward_params:
+        if action[0] == 'center' and deck_remaining>=5:
+            color = action[1][0]
+            if not env.expeditions[state['current_player']][color]:  # expedition not started
+                color_values = [int(c[1]) for c in player_hand if c[0] == color and c[1] != 'X']
+                color_sum = sum(color_values)
+                if color_sum >= tgt_pts:
+                    step_reward += reward_params[rfnc]
+                    rule_counter["bad_center"] += 1
+                    if random.random() < 1e-4:
+                        print(f"Bad center {action} holding {player_hand}")
+
+    # Reward a smart discard of a value less than the top card on the opp exp pile
+    rfnc='smart_opp_center'
+    if rfnc in step_functions and rfnc in reward_params:
+        if action[0] == 'center':
+            color = action[1][0]
+            card_val = int(action[1][1]) if action[1][1] != 'X' else None
+            opp_pile = env.expeditions[opponent].get(color, [])
+            opp_vals = [int(c[1]) for c in opp_pile if c[1] != 'X']
+            if card_val is not None and any(v > card_val for v in opp_vals):
+                step_reward += reward_params[rfnc]
+                rule_counter["smart_opp_center"] += 1
+                if random.random() < 1e-4:
+                    print(f"Smart center play {action} with opp exp {opp_pile}")
+
+    if step_reward>max_reward:
+        step_reward=max_reward
+        
+    return step_reward
 
