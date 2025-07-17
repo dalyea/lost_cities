@@ -1,4 +1,4 @@
-# Reinforcement Learning For Lost Cities - Version V1ES
+## Reinforcement Learning For Lost Cities - Version V1ES
 
 GRID SEARCH - Version V1ES
 
@@ -6,7 +6,7 @@ I re-factored the code to put all the basic setup and functions in the file V1E_
 The training is now in a function, and there is a grid search (hence the S) loop that explores 256 combinations of parameters.
 This is the first of 3 grid searches - 1. setup and NN 2. step reward inclusions 3. step reward values
 
-## Grid Search #1
+# Grid Search #1
 Under consideration here for setup are:
 * nn_layer_1 = neurons in layer 1 of the NN (nn_layer_2 is fixed at size 32)
 * nn_layer_2_dropout = dropout rate in layer 2 of the NN
@@ -51,12 +51,12 @@ for some of the top grid combinations.
 
 ![Learning Progress](top8-line-20000.png)
 
-## Grid Search #2
+# Grid Search #2
 Here I focus on which of the step rewards I defined have the best impact on achieving higher scores. I fixed 3 of the rewards as always included, then train 55 times to capture adding all combinations of 0, 1, or 2 of the other 10 step reward rules. (1+10+45).
 
 ![Top Rewards](top-step-rewards-10000.png)
 
-## Grid Search #3
+# Grid Search #3
 Now the intent is determine, at least directionally, if small or large step rewards are beneficial for the step rewards. I fixed 3 of the reward values as always included, in order to reduce the search space, then train 128 times to explore small vs. large rewards for 7 rewards.
 <pre>
 reward_grid = {
