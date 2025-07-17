@@ -1,10 +1,13 @@
 ## Reinforcement Learning For Lost Cities - Version V1ES
 
-GRID SEARCH - Version V1ES
+## GRID SEARCH - Version V1ES
 
 I re-factored the code to put all the basic setup and functions in the file V1E_main.py and then to put the training in a notebook.
 The training is now in a function, and there is a grid search (hence the S) loop that explores 256 combinations of parameters.
-This is the first of 3 grid searches - 1. setup and NN 2. step reward inclusions 3. step reward values
+There are 3 grid searches:
+1. setup and NN
+2. step reward inclusions
+3. step reward values
 
 # Grid Search #1
 Under consideration here for setup are:
